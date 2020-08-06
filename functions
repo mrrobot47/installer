@@ -116,10 +116,12 @@ ee_log_fail() {
 
 parse_args() {
   declare desc="top-level cli arg parser"
-  local next_index=1; local skip=false; local args=("$@")
+  local next_index=1
+  local skip=false
+  local args=("$@")
   for arg in "$@"; do
     if [[ "$skip" == "true" ]]; then
-      next_index=$(( next_index + 1 ))
+      next_index=$((next_index + 1))
       skip=false
       continue
     fi
@@ -138,22 +140,23 @@ parse_args() {
         export EE_SITE_ALL=1
         ;;
       --remote-host)
-        export REMOTE_HOST=${args[$next_index]}; skip=true
+        export REMOTE_HOST=${args[$next_index]}
+        skip=true
         ;;
     esac
-    next_index=$(( next_index + 1 ))
+    next_index=$((next_index + 1))
   done
   return 0
 }
 
 function check_ssh() {
   ee_log_info1 "Checking connection to remote server."
-  ssh -q -i $SSH_KEY "root@$REMOTE_HOST" exit > /dev/null 2>&1 # No need to show this output
+  ssh -q -i $SSH_KEY "root@$REMOTE_HOST" exit >/dev/null 2>&1 # No need to show this output
   if [ $? -eq 0 ]; then
     true
   else
     if [ ! -f "$SSH_KEY" ]; then
-      ssh-keygen -t rsa -b 4096 -N '' -C 'ee3_to_ee4_key' -f $SSH_KEY > /dev/null 2>&1 # No need to show this output
+      ssh-keygen -t rsa -b 4096 -N '' -C 'ee3_to_ee4_key' -f $SSH_KEY >/dev/null 2>&1 # No need to show this output
     else
       ee_log_info2 "If you have not done so already, you need to add the following"
       cat "${SSH_KEY}.pub"
@@ -179,9 +182,9 @@ function run_remote_command() {
 }
 
 function setup_docker() {
+  ee_log_info1 "Installing Docker"
   # Check if docker exists. If not start docker installation.
   if ! command -v docker >/dev/null 2>&1; then
-    ee_log_info1 "Installing Docker"
     # Running standard docker installation.
     wget --quiet get.docker.com -O docker-setup.sh
     sh docker-setup.sh
@@ -196,13 +199,15 @@ function setup_docker() {
         grep '"tag_name":' | # Get tag line
         sed -E 's/.*"([^"]+)".*/\1/' # Pluck JSON value
     }
-    ARTIFACT_URL="https://github.com/docker/compose/releases/download/$(get_latest_release docker/compose)/docker-compose-$(uname -s)-$(uname -m)"
-    curl -L $ARTIFACT_URL -o /usr/local/bin/docker-compose
+    #ARTIFACT_URL="https://github.com/docker/compose/releases/download/$(get_latest_release docker/compose)/docker-compose-$(uname -s)-$(uname -m)"
+    #curl -L $ARTIFACT_URL -o /usr/local/bin/docker-compose
+    curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
   fi
 }
 
 function setup_php() {
+  ee_log_info1 "Installing PHP"
   if ! command -v php >/dev/null 2>&1; then
     # Checking linux distro. Currently only Ubuntu and Debian are supported.
     if [ "$EE_LINUX_DISTRO" == "Ubuntu" ]; then
@@ -213,7 +218,7 @@ function setup_php() {
       add-apt-repository -y ppa:ondrej/php
       apt-get update
       # Installing php-cli, which is the minimum requirement to run EasyEngine
-      apt-get -y install php7.2-cli
+      apt-get -y install php7.3-cli
     elif [ "$EE_LINUX_DISTRO" == "Debian" ]; then
       ee_log_info1 "Installing PHP cli"
       # Nobody should have to change their name to enable a package installation
@@ -223,14 +228,15 @@ function setup_php() {
       export LC_ALL=en_US.UTF-8
       export LANG=en_US.UTF-8
       wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-      ee_log_info1 "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
+      echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
       apt-get update
-      apt-get install php7.2-cli -y
+      apt-get install php7.3-cli -y
     fi
   fi
 }
 
 function setup_php_extensions() {
+  ee_log_info1 "Installing PHP extensions"
   # Setting up the three required php extensions for EasyEngine.
   if command -v php >/dev/null 2>&1; then
     php_extensions=(pcntl curl sqlite3 zip)
@@ -252,6 +258,39 @@ function setup_php_extensions() {
       apt install -y $packages
     done
   fi
+}
+
+function create_swap() {
+  ee_log_info2 "Enabling 1GiB swap"
+  EE_SWAP_FILE="/ee-swapfile"
+  fallocate -l 1G $EE_SWAP_FILE && \
+  chmod 600 $EE_SWAP_FILE && \
+  chown root:root $EE_SWAP_FILE && \
+  mkswap $EE_SWAP_FILE && \
+  swapon $EE_SWAP_FILE
+}
+
+function check_swap() {
+  ee_log_info1 "Checking swap"
+  if free | awk '/^Swap:/ {exit !$2}'; then
+    :
+  else
+    ee_log_info1 "No swap detected"
+    create_swap
+  fi
+}
+
+function check_depdendencies() {
+  ee_log_info1 "Checking dependencies"
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    ee_log_info2 "Installing sqlite3"
+    apt install sqlite3 -y
+  fi
+
+  setup_docker
+  setup_php
+  setup_php_extensions
+  check_swap
 }
 
 function download_and_install_easyengine() {

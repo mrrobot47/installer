@@ -15,17 +15,7 @@ function bootstrap() {
     apt update && apt-get install $packages -y
   fi
 
-  curl -o "$TMP_WORK_DIR/helper-functions" https://raw.githubusercontent.com/EasyEngine/installer/master/functions
-}
-
-function setup_dependencies() {
-  ee_log_info1 "Checking and Installing dependencies"
-  ee_log_info1 "Installing Docker"
-  setup_docker
-  ee_log_info1 "Installing PHP"
-  setup_php
-  ee_log_info1 "Installing PHP extensions"
-  setup_php_extensions
+  curl -so "$TMP_WORK_DIR/helper-functions" https://raw.githubusercontent.com/EasyEngine/installer/master/functions
 }
 
 # Main installation function, to setup and run once the installer script is loaded.
@@ -47,7 +37,7 @@ function do_install() {
   source "$TMP_WORK_DIR/helper-functions"
 
 
-  setup_dependencies
+  check_depdendencies
   ee_log_info1 "Setting up EasyEngine"
   download_and_install_easyengine
   ee_log_info1 "Pulling EasyEngine docker images"

@@ -44,7 +44,7 @@ function do_install() {
   pull_easyengine_images
   add_ssl_renew_cron
   ee_log_info1 "Run \"ee help site\" for more information on how to create a site."
-  rm -rf /helper-functions
+  rm /helper-functions
 }
 
 # Invoking the main installation function.

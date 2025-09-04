@@ -231,7 +231,7 @@ function setup_php_extensions() {
   ee_log_info1 "Installing PHP extensions"
   # Setting up the three required php extensions for EasyEngine.
   if command -v php >/dev/null 2>&1; then
-    php_extensions=(pcntl curl sqlite3 zip)
+    php_extensions=(curl sqlite3 zip)
     if ! command -v gawk >/dev/null 2>&1; then
       apt install gawk -y
     fi
